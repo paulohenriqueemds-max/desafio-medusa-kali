@@ -1,89 +1,54 @@
-# desafio-medusa-kali
-# Desafio: Brute Force com Medusa e Kali Linux
+# 📝 Relatório de Auditoria: Ataque de Força Bruta
 
-**Autor:** Paulo Henrique  
-**Data:** 2025-11-04
-
----
-
-## Descrição
-
-Usei máquinas virtuais: instalei **Kali Linux** (atacante) e **Metasploitable2** (alvo) para realizar testes de força bruta em FTP, SMB e formulários web. O objetivo deste repositório é documentar o processo, os comandos e o que aprendi.
+**Projeto:** Desafio DIO - Brute Force com Kali Linux e Medusa
+**Autor:** Paulo Henrique
+**Data:** 04 de Novembro de 2025
 
 ---
 
-## Ambiente
+## 1. Introdução
 
-- VirtualBox 
-- Kali Linux — máquina atacante (ex.: `192.168.56.100`)  
-- Metasploitable2 — máquina alvo (ex.: `192.168.56.101`)  
-- Ferramentas: `medusa`, `hydra`, `nmap`, `smbclient`, `crunch`
+Este documento resume a execução do desafio prático de cibersegurança, onde simulei ataques de força bruta contra um ambiente intencionalmente vulnerável, o Metasploitable 2. O objetivo foi aplicar o conhecimento adquirido nas aulas para entender a mecânica dos ataques e desenvolver uma mentalidade de defesa (Blue Team).
 
----
+O foco da auditoria foi a exploração de credenciais fracas ou padrão em serviços de rede e formulários web, utilizando as ferramentas **Medusa** e **Hydra**.
 
-## Estrutura do repositório
+## 2. Configuração do Laboratório
 
-```
-desafio_medusa/
-├─ README.md        ← este arquivo
-├─ report.md        ← relato simples
-├─ commands.txt     ← comandos prontos
-├─ users.txt
-└─ /wordlists
-   ├─ simple.txt
-   └─ spray.txt
-```
+O ambiente foi montado com sucesso no VirtualBox, usando uma rede Host-Only para garantir o isolamento total.
 
----
+* **Máquina Atacante:** Kali Linux (192.168.56.100)
+* **Máquina Alvo:** Metasploitable 2 (192.168.56.101)
 
-## Comandos básicos (copiar/colar)
+A primeira etapa, a **enumeração**, utilizando `nmap`, confirmou a presença dos principais serviços a serem auditados: FTP (21), SMB (445) e o servidor web (80) que hospeda o DVWA.
 
-### Enumeração
-```bash
-nmap -sC -sV -T4 192.168.56.101 -oN nmap_initial.txt
-```
+## 3. Sumário dos Ataques e Descobertas
 
-### FTP com Medusa
-```bash
-medusa -h 192.168.56.101 -u msfadmin -P ~/wordlists/simple.txt -M ftp -t 8 | tee medusa_ftp_output.txt
-```
+### A. Força Bruta Clássica (FTP)
 
-### SMB (password spraying) com Medusa
-```bash
-medusa -h 192.168.56.101 -U users.txt -P ~/wordlists/spray.txt -M smbnt -t 8 | tee medusa_smb_output.txt
-```
+* **Ferramenta:** Medusa.
+* **Descoberta:** O ataque foi bem-sucedido rapidamente devido ao uso de senhas fracas e padrão (`msfadmin` / `msfadmin`). O serviço FTP não implementa nenhum mecanismo de *rate limiting* ou bloqueio de tentativas.
+* **Vulnerabilidade:** Credenciais fracas, falta de controle de acesso.
 
-### DVWA (form) com Hydra
-```bash
-hydra -l admin -P ~/wordlists/simple.txt 192.168.56.101 http-post-form "/dvwa/login.php:username=^USER^&password=^PASS^&Login=Login:S=Location" -t 6
-```
+### B. Password Spraying (SMB)
 
----
+* **Ferramenta:** Medusa.
+* **Descoberta:** A técnica de *password spraying* foi aplicada para testar uma única senha comum em uma lista de usuários, simulando um ataque que tenta evitar o bloqueio de contas individuais. A ausência de bloqueio no Metasploitable 2 permitiu a validação da técnica.
+* **Vulnerabilidade:** Ameaça alta quando senhas comuns são utilizadas em massa (ex: "Trocar123").
 
-## O que aprendi (resumo)
+### C. Formulário Web (DVWA)
 
-- Sempre começar por **enumeração** (`nmap`) para identificar serviços.  
-- `Medusa` é bom pra protocolos que aceitam autenticação direta (FTP, SMB com módulos disponíveis).  
-- `Hydra` é mais prático para **form-based logins**.  
-- `Password spraying` tenta poucas senhas em muitos usuários para evitar lockout.  
-- Documentar comandos e validar manualmente é essencial.
+* **Ferramenta:** Hydra.
+* **Descoberta:** O Hydra foi eficaz em automatizar o processo de login HTTP POST, aproveitando a total falta de proteção do DVWA (como CAPTCHA ou tokens anti-CSRF).
+* **Vulnerabilidade:** Formulários web desprotegidos contra automação (bots).
 
----
+## 4. Recomendações de Segurança (Mitigação)
 
-## Observações importantes
+Os testes confirmam que a maior parte dos serviços seria vulnerável a ataques de força bruta em um ambiente real. As seguintes medidas são urgentes:
 
-- **Nunca** execute esses testes em sistemas sem autorização.
+1.  **Implantar MFA (Autenticação Multifator):** A solução mais eficaz, pois a senha sozinha não garante mais o acesso.
+2.  **Utilizar Fail2Ban:** Configurar essa ferramenta em serviços como FTP e SSH para bloquear automaticamente o endereço IP de origem após três a cinco tentativas de login fracassadas.
+3.  **Auditoria de Senhas:** Forçar o uso de senhas complexas e, idealmente, exigir que os usuários troquem as senhas fracas descobertas.
 
----
+## 5. Conclusão da Jornada
 
-## Próximos passos (sugestões)
-
-- Substituir wordlists por listas mais direcionadas ao contexto.  
-- Testar ferramentas complementares (CrackMapExec, Impacket).  
-- Implementar um pequeno script para analisar logs e detectar password spraying.
-
----
-
-## Licença
-
-Uso educacional e de aprendizado.
+O desafio foi fundamental para solidificar a diferença entre as ferramentas (Medusa para protocolos, Hydra para web) e, mais importante, para internalizar a mentalidade de que a prevenção (Defesa) sempre deve vir após a descoberta da vulnerabilidade (Ataque). O projeto atua como um excelente portfólio de competências técnicas e analíticas.
